@@ -3,8 +3,7 @@ pragma solidity ^0.4.21;
 contract ProductTracker {
     
     struct Producer {
-        string firstName;
-        string lastName;
+        string fullName;
         string phoneNumber;
         string eMail;
     }
@@ -20,7 +19,7 @@ contract ProductTracker {
         string inspectionDate1;
         string inspectionDate2;
         string inspectionDate3;
-        bool pesticideUse;
+        string pesticideUse;
         bool initialized;    
     }
     
@@ -33,13 +32,14 @@ contract ProductTracker {
     mapping(address => mapping(string => bool)) private walletStore;
     
     event ProducerHistory(address indexed producer);
-    event ProducerInfo(string firstName, string lastName, string phoneNumber, string eMail);
+    event ProducerInfo(address producer, string fullName, string phoneNumber, string eMail);
     event ProductCreate(address account, string uuid, string producerName);
     event RejectCreate(address account, string uuid, string message);
     event ProductTransfer(address from, address to, string uuid);
     event RejectTransfer(address from, address to, string uuid, string message);
-    
-    function addProducer(address _producer, string _firstName, string _lastName, string _phoneNumber, string _eMail) public {
+    event DigitalSignature(address addr);
+
+    function addProducer(address _producer, string _fullName, string _phoneNumber, string _eMail) public {
         var producer = producers[_producer];
         uint index;
         for(uint i = 0; i < producersAccounts.length; i ++){
@@ -50,22 +50,16 @@ contract ProductTracker {
                 delete producersAccounts[index];
                 delete producers[_producer];
                 producersAccounts.length --;
-
-                producer.firstName = _firstName;
-                producer.lastName = _lastName;
-                producer.phoneNumber = _phoneNumber;
-                producer.eMail = _eMail;
             }
         }
         
-        producer.firstName = _firstName;
-        producer.lastName = _lastName;
+        producer.fullName = _fullName;
         producer.phoneNumber = _phoneNumber;
         producer.eMail = _eMail;
         
         producersAccounts.push(_producer) - 1;
         emit ProducerHistory(_producer);
-        emit ProducerInfo(_firstName, _lastName, _phoneNumber, _eMail);
+        emit ProducerInfo(_producer, _fullName, _phoneNumber, _eMail);
     }
     
     function removeProducer(address _producerAddress) public {
@@ -87,8 +81,8 @@ contract ProductTracker {
         return producersAccounts;
     }
     
-    function getOneProducer(address _address) view public returns (string, string, string, string) {
-        return (producers[_address].firstName, producers[_address].lastName, producers[_address].phoneNumber, producers[_address].eMail);
+    function getOneProducer(address _address) view public returns (string, string, string) {
+        return (producers[_address].fullName, producers[_address].phoneNumber, producers[_address].eMail);
     }
     
     function producersNumber() view public returns (uint) {
@@ -106,7 +100,7 @@ contract ProductTracker {
         string inspectionDate1,
         string inspectionDate2,
         string inspectionDate3,
-        bool pesticideUse) public {
+        string pesticideUse) public {
  
     if(productStore[uuid].initialized) {
         emit RejectCreate(msg.sender, uuid, "A product with this UUID already exists.");
@@ -119,7 +113,7 @@ contract ProductTracker {
       emit ProductCreate(msg.sender, uuid, producerName);
     }
     
-    function transferProduct(address to, string uuid) private{
+    function transferProduct(address to, string uuid) public {
  
     if(!productStore[uuid].initialized) {
         emit RejectTransfer(msg.sender, to, uuid, "No product with this UUID exists");
@@ -142,7 +136,7 @@ contract ProductTracker {
  
     }
     
-    function getProductByUUID2(string uuid) public constant returns (string, string, string, string, string, bool) {
+    function getProductByUUID2(string uuid) public constant returns (string, string, string, string, string, string) {
  
     return (productStore[uuid].receptionDate, productStore[uuid].issuanceDate, productStore[uuid].inspectionDate1, productStore[uuid].inspectionDate2, productStore[uuid].inspectionDate3, productStore[uuid].pesticideUse);
  
@@ -150,11 +144,22 @@ contract ProductTracker {
     
     function isOwnerOf(address owner, string uuid) public constant returns (bool) {
  
-    if(walletStore[owner][uuid]) {
-        return true;
-    }
+        if(walletStore[owner][uuid]) {
+            return true;
+        }
  
-    return false;
+        return false;
+    }
+    
+    // Enable digital signature. Generate signature with JS
+    function recoverAddress(bytes32 msgHash, uint8 v, bytes32 r, bytes32 s) public returns (address) {
+        var lol = ecrecover(msgHash, v, r, s);
+        emit DigitalSignature(lol);
+        return ecrecover(msgHash, v, r, s);
+    }
+    
+    function isSigned(address _addr, bytes32 msgHash, uint8 v, bytes32 r, bytes32 s) public returns (bool) {
+        return ecrecover(msgHash, v, r, s) == _addr;
     }
 
 }
