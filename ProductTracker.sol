@@ -3,9 +3,11 @@ pragma solidity ^0.4.21;
 contract ProductTracker {
     
     struct Producer {
+        string signature;
         string fullName;
         string phoneNumber;
         string eMail;
+        string uuid;
     }
     
     struct Product {
@@ -32,48 +34,47 @@ contract ProductTracker {
     mapping(address => mapping(string => bool)) private walletStore;
     
     event ProducerHistory(address indexed producer);
-    event ProducerInfo(address producer, string fullName, string phoneNumber, string eMail);
+    event ProducerInfo(address producerAddress, string fullName, string phoneNumber, string eMail, string uuid);
     event ProductCreate(address account, string uuid, string producerName);
     event RejectCreate(address account, string uuid, string message);
     event ProductTransfer(address from, address to, string uuid);
     event RejectTransfer(address from, address to, string uuid, string message);
     event DigitalSignature(address addr);
 
-    function addProducer(address _producer, string _fullName, string _phoneNumber, string _eMail) public {
-        var producer = producers[_producer];
-        uint index;
+    function addProducer(string _signature, string _fullName, string _phoneNumber, string _eMail, string _uuid) public {
+        
+        Producer storage producer = producers[msg.sender];
+
         for(uint i = 0; i < producersAccounts.length; i ++){
-            if(_producer == producersAccounts[i]){
-                index = i;
-                
-                producersAccounts[index] = producersAccounts[producersAccounts.length - 1];
-                delete producersAccounts[index];
-                delete producers[_producer];
+            if(msg.sender == producersAccounts[i]){
+                producersAccounts[i] = producersAccounts[producersAccounts.length - 1];
+                delete producersAccounts[i];
+                delete producers[msg.sender];
                 producersAccounts.length --;
             }
         }
         
+        producer.signature = _signature;
         producer.fullName = _fullName;
         producer.phoneNumber = _phoneNumber;
         producer.eMail = _eMail;
+        producer.uuid = _uuid;
+        producersAccounts.push(msg.sender) - 1;
         
-        producersAccounts.push(_producer) - 1;
-        emit ProducerHistory(_producer);
-        emit ProducerInfo(_producer, _fullName, _phoneNumber, _eMail);
+        emit ProducerHistory(msg.sender);
+        emit ProducerInfo(msg.sender, _fullName, _phoneNumber, _eMail, _uuid);
     }
     
     function removeProducer(address _producerAddress) public {
-        uint index;
+        // Delete producer from struct and mapping
         for(uint i = 0; i < producersAccounts.length; i ++){
             if(_producerAddress == producersAccounts[i]){
-                index = i;
+                producersAccounts[i] = producersAccounts[producersAccounts.length - 1];
+                delete producersAccounts[i];
+                delete producers[_producerAddress];
+                producersAccounts.length --;
             }
-        }
-        
-        producersAccounts[index] = producersAccounts[producersAccounts.length - 1];
-        delete producersAccounts[index];
-        delete producers[_producerAddress];
-        producersAccounts.length --;
+        }  
         emit ProducerHistory(_producerAddress);
     }
     
@@ -81,8 +82,8 @@ contract ProductTracker {
         return producersAccounts;
     }
     
-    function getOneProducer(address _address) view public returns (string, string, string) {
-        return (producers[_address].fullName, producers[_address].phoneNumber, producers[_address].eMail);
+    function getOneProducer(address _address) view public returns (string, string, string, string, string) {
+        return (producers[_address].signature, producers[_address].fullName, producers[_address].phoneNumber, producers[_address].eMail, producers[_address].uuid);
     }
     
     function producersNumber() view public returns (uint) {
@@ -151,15 +152,12 @@ contract ProductTracker {
         return false;
     }
     
-    // Enable digital signature. Generate signature with JS
-    function recoverAddress(bytes32 msgHash, uint8 v, bytes32 r, bytes32 s) public returns (address) {
-        var lol = ecrecover(msgHash, v, r, s);
-        emit DigitalSignature(lol);
-        return ecrecover(msgHash, v, r, s);
-    }
-    
-    function isSigned(address _addr, bytes32 msgHash, uint8 v, bytes32 r, bytes32 s) public returns (bool) {
-        return ecrecover(msgHash, v, r, s) == _addr;
+    // Find out if the producer info is signed
+    function isSigned(address _addr, bytes32 hash, uint8 v, bytes32 r, bytes32 s) constant returns(bool) {
+        
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        bytes32 prefixedHash = keccak256(prefix, hash);
+        return ecrecover(prefixedHash, v, r, s) == (_addr);
     }
 
 }
